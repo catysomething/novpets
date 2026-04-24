@@ -1,0 +1,35 @@
+import { NextResponse } from "next/server";
+import {
+  addMedicalRecordsForPet,
+  validateMedicalRecordsPayload,
+} from "@/lib/medical-records-service";
+
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function POST(request: Request, context: RouteContext) {
+  const { id: petId } = await context.params;
+
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const validation = await validateMedicalRecordsPayload(payload);
+  if (!validation.data) {
+    return NextResponse.json(
+      { error: "Validation failed.", details: validation.errors },
+      { status: 400 },
+    );
+  }
+
+  const result = await addMedicalRecordsForPet(petId, validation.data);
+  if (!result) {
+    return NextResponse.json({ error: "Pet not found." }, { status: 404 });
+  }
+
+  return NextResponse.json({ created: result }, { status: 201 });
+}
