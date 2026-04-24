@@ -48,18 +48,21 @@ model MedicalRecordType {
 }
 
 model Vaccine {
-  id               String              @id @default(uuid())
+  id               String            @id @default(uuid())
   petId            String
-  pet              Pet                 @relation(fields: [petId], references: [id], onDelete: Cascade)
+  pet              Pet               @relation(fields: [petId], references: [id], onDelete: Cascade)
   recordTypeId     String
-  recordType       MedicalRecordType   @relation("VaccineMedicalRecordType", fields: [recordTypeId], references: [id])
+  recordType       MedicalRecordType @relation("VaccineMedicalRecordType", fields: [recordTypeId], references: [id])
   vaccineName      String
   dateAdministered DateTime
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  deletedAt        DateTime?
+  removalNote      String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([petId])
   @@index([recordTypeId])
+  @@index([deletedAt])
 }
 
 model Allergy {
@@ -71,11 +74,14 @@ model Allergy {
   allergyName  String
   reactions    String
   severity     AllergySeverity
+  deletedAt    DateTime?
+  removalNote  String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
   @@index([petId])
   @@index([recordTypeId])
+  @@index([deletedAt])
 }
 
 enum AllergySeverity {

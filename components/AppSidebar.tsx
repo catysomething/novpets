@@ -13,6 +13,8 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const isDashboard = pathname === "/";
   const isPetsNav = pathname === "/pets" || pathname.startsWith("/pets/");
+  const isAdminToolsNav =
+    pathname === "/admin-tools" || pathname.startsWith("/admin-tools/");
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-emerald-950/10 bg-eucalyptus md:flex md:flex-col">
@@ -28,6 +30,9 @@ export default function AppSidebar() {
         </Link>
         <Link href="/pets" className={navItemClass(isPetsNav)}>
           Pets
+        </Link>
+        <Link href="/admin-tools" className={navItemClass(isAdminToolsNav)}>
+          Admin Tools
         </Link>
       </nav>
     </aside>

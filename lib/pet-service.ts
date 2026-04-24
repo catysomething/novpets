@@ -59,6 +59,13 @@ export type CreatePetInput = {
 };
 
 export type UpdatePetInput = Partial<CreatePetInput>;
+export type DeactivatedPet = {
+  id: string;
+  name: string;
+  animalType: string;
+  ownerName: string;
+  deactivatedAt: string;
+};
 
 function mapPetToResponse(pet: PrismaPet): Pet {
   return {
@@ -253,10 +260,7 @@ export async function listPets(filters?: ListPetsFilters): Promise<Pet[]> {
   if (search) {
     // SQLite: Prisma has no `mode: insensitive` here; substring match is case-sensitive.
     andClauses.push({
-      OR: [
-        { name: { contains: search } },
-        { ownerName: { contains: search } },
-      ],
+      OR: [{ name: { contains: search } }, { ownerName: { contains: search } }],
     });
   }
 
@@ -270,9 +274,11 @@ export async function listPets(filters?: ListPetsFilters): Promise<Pet[]> {
     orderBy: { createdAt: "desc" },
     include: {
       vaccines: {
+        where: { deletedAt: null },
         orderBy: { dateAdministered: "desc" },
       },
       allergies: {
+        where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
       },
     },
@@ -303,10 +309,11 @@ export async function getPetDashboardStats(): Promise<PetDashboardStats> {
       name: true,
       animalType: true,
       vaccines: {
+        where: { deletedAt: null },
         select: { vaccineName: true, dateAdministered: true },
         orderBy: { dateAdministered: "asc" },
       },
-      allergies: { select: { id: true } },
+      allergies: { where: { deletedAt: null }, select: { id: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -358,9 +365,11 @@ export async function getPetById(id: string): Promise<Pet | null> {
     where: { id, deletedAt: null },
     include: {
       vaccines: {
+        where: { deletedAt: null },
         orderBy: { dateAdministered: "desc" },
       },
       allergies: {
+        where: { deletedAt: null },
         orderBy: { createdAt: "desc" },
       },
     },
@@ -429,6 +438,63 @@ export async function deletePet(id: string): Promise<boolean> {
         entityType: PET_ENTITY,
         entityId: id,
         action: "DELETE",
+        changes: {
+          before: petAuditSnapshot(existing),
+          after: petAuditSnapshot(pet),
+        },
+      },
+    });
+
+    return true;
+  });
+}
+
+export async function listDeactivatedPets(): Promise<DeactivatedPet[]> {
+  const pets = await prisma.pet.findMany({
+    where: { NOT: { deletedAt: null } },
+    select: {
+      id: true,
+      name: true,
+      animalType: true,
+      ownerName: true,
+      deletedAt: true,
+    },
+    orderBy: { deletedAt: "desc" },
+  });
+
+  return pets.flatMap((pet) => {
+    if (!pet.deletedAt) return [];
+    return [
+      {
+        id: pet.id,
+        name: pet.name,
+        animalType: pet.animalType,
+        ownerName: pet.ownerName,
+        deactivatedAt: pet.deletedAt.toISOString(),
+      },
+    ];
+  });
+}
+
+export async function reactivatePet(id: string): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.pet.findFirst({
+      where: { id, NOT: { deletedAt: null } },
+    });
+    if (!existing) {
+      return false;
+    }
+
+    const pet = await tx.pet.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        entityType: PET_ENTITY,
+        entityId: id,
+        action: "REACTIVATE",
         changes: {
           before: petAuditSnapshot(existing),
           after: petAuditSnapshot(pet),

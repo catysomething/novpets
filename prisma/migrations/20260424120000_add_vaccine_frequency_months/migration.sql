@@ -1,0 +1,2 @@
+-- This migration directory existed without a migration.sql file.
+-- Intentionally left as a no-op so migration history remains valid.

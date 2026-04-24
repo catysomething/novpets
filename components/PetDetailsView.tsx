@@ -19,7 +19,7 @@ function dateInputValueFromIso(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
-/** US-style display for profile (calendar date in local TZ). */
+/** US-style display for profile (use local TZ). */
 function formatMMDDYYYY(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -154,6 +154,8 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
   );
   const [editMedicalError, setEditMedicalError] = useState<string | null>(null);
   const [isSavingEditMedical, setIsSavingEditMedical] = useState(false);
+  const [isDeletingEditMedical, setIsDeletingEditMedical] = useState(false);
+  const [medicalRemovalNote, setMedicalRemovalNote] = useState("");
 
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -196,6 +198,7 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
 
   function openEditMedicalRecord(row: HealthRecordRow) {
     setEditMedicalError(null);
+    setMedicalRemovalNote("");
     if (row.kind === "vaccine") {
       setEditingRecord({
         kind: "vaccine",
@@ -217,6 +220,7 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
   function closeEditMedicalModal() {
     setEditingRecord(null);
     setEditMedicalError(null);
+    setMedicalRemovalNote("");
   }
 
   async function handleSaveEdit(event: FormEvent<HTMLFormElement>) {
@@ -394,6 +398,58 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
       setEditMedicalError("Could not update record. Please try again.");
     } finally {
       setIsSavingEditMedical(false);
+    }
+  }
+
+  async function handleDeleteEditedMedicalRecord() {
+    if (!pet || !editingRecord) return;
+
+    const removalNote = medicalRemovalNote.trim();
+    if (!removalNote) {
+      setEditMedicalError("Please add a removal note before deleting this record.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Delete this ${editingRecord.kind} record? This will hide it from active medical history.`,
+      )
+    ) {
+      return;
+    }
+
+    setEditMedicalError(null);
+    setIsDeletingEditMedical(true);
+    try {
+      const response = await fetch(`/api/pets/${pet.id}/medical-records`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recordId: editingRecord.id,
+          kind: editingRecord.kind,
+          removalNote,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        error?: string;
+        details?: string[];
+      };
+
+      if (!response.ok) {
+        const extra = data.details?.length ? ` ${data.details.join(" ")}` : "";
+        setEditMedicalError(
+          `${data.error ?? "Could not delete record."}${extra}`.trim(),
+        );
+        return;
+      }
+
+      closeEditMedicalModal();
+      await loadPet();
+    } catch {
+      setEditMedicalError("Could not delete record. Please try again.");
+    } finally {
+      setIsDeletingEditMedical(false);
     }
   }
 
@@ -1132,6 +1188,24 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
                 </>
               )}
 
+              <div>
+                <label
+                  htmlFor="edit-removal-note"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Removal note (required for delete)
+                </label>
+                <textarea
+                  id="edit-removal-note"
+                  name="removalNote"
+                  value={medicalRemovalNote}
+                  onChange={(event) => setMedicalRemovalNote(event.target.value)}
+                  rows={3}
+                  placeholder="Add why this medical record is being removed."
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+
               {editMedicalError ? (
                 <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   {editMedicalError}
@@ -1141,14 +1215,23 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
                 <button
                   type="button"
+                  onClick={() => void handleDeleteEditedMedicalRecord()}
+                  disabled={isSavingEditMedical || isDeletingEditMedical}
+                  className="mr-auto rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isDeletingEditMedical ? "Deleting…" : "Delete record"}
+                </button>
+                <button
+                  type="button"
                   onClick={closeEditMedicalModal}
+                  disabled={isSavingEditMedical || isDeletingEditMedical}
                   className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingEditMedical}
+                  disabled={isSavingEditMedical || isDeletingEditMedical}
                   className="rounded-md bg-eucalyptus-dark px-4 py-2 text-sm font-medium text-white shadow-sm shadow-eucalyptus-darker/25 transition hover:bg-eucalyptus-darker disabled:opacity-60"
                 >
                   {isSavingEditMedical ? "Saving…" : "Save changes"}

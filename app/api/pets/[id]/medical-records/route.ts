@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import {
   addMedicalRecordsForPet,
+  deleteMedicalRecordForPet,
   updateMedicalRecordForPet,
+  validateDeleteMedicalRecordPayload,
   validateMedicalRecordsPayload,
   validateUpdateMedicalRecordPayload,
 } from "@/lib/medical-records-service";
@@ -63,4 +65,33 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   return NextResponse.json({ updated: result });
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  const { id: petId } = await context.params;
+
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const validation = validateDeleteMedicalRecordPayload(payload);
+  if (!validation.data) {
+    return NextResponse.json(
+      { error: "Validation failed.", details: validation.errors },
+      { status: 400 },
+    );
+  }
+
+  const result = await deleteMedicalRecordForPet(petId, validation.data);
+  if (!result) {
+    return NextResponse.json(
+      { error: "Pet or medical record not found." },
+      { status: 404 },
+    );
+  }
+
+  return NextResponse.json({ deleted: result });
 }
