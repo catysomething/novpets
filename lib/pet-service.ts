@@ -40,6 +40,7 @@ export type VaccineRecord = {
   id: string;
   vaccineName: string;
   dateAdministered: string;
+  updatedAt: string;
 };
 
 export type AllergyRecord = {
@@ -47,6 +48,7 @@ export type AllergyRecord = {
   allergyName: string;
   reactions: string;
   severity: "mild" | "severe";
+  updatedAt: string;
 };
 
 export type CreatePetInput = {
@@ -78,12 +80,14 @@ function mapPetWithMedicalRecordsToResponse(
       id: string;
       vaccineName: string;
       dateAdministered: Date;
+      updatedAt: Date;
     }[];
     allergies: {
       id: string;
       allergyName: string;
       reactions: string;
       severity: "mild" | "severe";
+      updatedAt: Date;
     }[];
   },
 ): Pet {
@@ -99,12 +103,14 @@ function mapPetWithMedicalRecordsToResponse(
       id: record.id,
       vaccineName: record.vaccineName,
       dateAdministered: record.dateAdministered.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
     })),
     allergies: pet.allergies.map((record) => ({
       id: record.id,
       allergyName: record.allergyName,
       reactions: record.reactions,
       severity: record.severity,
+      updatedAt: record.updatedAt.toISOString(),
     })),
   };
 }

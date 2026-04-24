@@ -1,6 +1,9 @@
 import type { MedicalRecordType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+const VACCINE_ENTITY = "Vaccine" as const;
+const ALLERGY_ENTITY = "Allergy" as const;
+
 type PropertyDefinition =
   | "string"
   | "date"
@@ -305,4 +308,220 @@ export async function addMedicalRecordsForPet(
   });
 
   return { vaccineCount: vaccines.length, allergyCount: allergies.length };
+}
+
+type UpdateMedicalRecordPayload = {
+  recordId: string;
+  kind: "vaccine" | "allergy";
+  vaccineName?: string;
+  dateAdministered?: string;
+  allergyName?: string;
+  reactions?: string;
+  severity?: "mild" | "severe";
+};
+
+export async function validateUpdateMedicalRecordPayload(payload: unknown): Promise<{
+  data?: UpdateMedicalRecordPayload;
+  errors?: string[];
+}> {
+  if (!payload || typeof payload !== "object") {
+    return { errors: ["Request body must be a JSON object."] };
+  }
+
+  const body = payload as Record<string, unknown>;
+  const recordId = normalizeString(body.recordId);
+  const kindRaw = normalizeString(body.kind)?.toLowerCase();
+  const kind =
+    kindRaw === "vaccine" || kindRaw === "allergy" ? kindRaw : null;
+
+  const errors: string[] = [];
+  if (!recordId) errors.push("recordId is required.");
+  if (!kind) errors.push('kind must be either "vaccine" or "allergy".');
+
+  if (kind === "vaccine") {
+    const vaccineNameRaw = body.vaccineName;
+    const dateAdministeredRaw = body.dateAdministered;
+    const vaccineName =
+      vaccineNameRaw === undefined ? undefined : normalizeString(vaccineNameRaw);
+    const dateAdministered =
+      dateAdministeredRaw === undefined
+        ? undefined
+        : normalizeDateString(dateAdministeredRaw);
+
+    if (vaccineNameRaw !== undefined && !vaccineName) {
+      errors.push("vaccineName must be a non-empty string.");
+    }
+    if (dateAdministeredRaw !== undefined && !dateAdministered) {
+      errors.push("dateAdministered must be a valid date.");
+    }
+    if (vaccineNameRaw === undefined && dateAdministeredRaw === undefined) {
+      errors.push("Provide at least one field to update.");
+    }
+
+    if (errors.length > 0 || !recordId) return { errors };
+    return {
+      data: {
+        recordId,
+        kind,
+        ...(vaccineName ? { vaccineName } : {}),
+        ...(dateAdministered ? { dateAdministered } : {}),
+      },
+    };
+  }
+
+  if (kind === "allergy") {
+    const allergyNameRaw = body.allergyName;
+    const reactionsRaw = body.reactions;
+    const severityRaw = body.severity;
+    const allergyName =
+      allergyNameRaw === undefined ? undefined : normalizeString(allergyNameRaw);
+    const reactions =
+      reactionsRaw === undefined ? undefined : normalizeString(reactionsRaw);
+    const severity =
+      severityRaw === undefined
+        ? undefined
+        : severityRaw === "mild" || severityRaw === "severe"
+          ? severityRaw
+          : null;
+
+    if (allergyNameRaw !== undefined && !allergyName) {
+      errors.push("allergyName must be a non-empty string.");
+    }
+    if (reactionsRaw !== undefined && !reactions) {
+      errors.push("reactions must be a non-empty string.");
+    }
+    if (severityRaw !== undefined && !severity) {
+      errors.push('severity must be "mild" or "severe".');
+    }
+    if (
+      allergyNameRaw === undefined &&
+      reactionsRaw === undefined &&
+      severityRaw === undefined
+    ) {
+      errors.push("Provide at least one field to update.");
+    }
+
+    if (errors.length > 0 || !recordId) return { errors };
+    return {
+      data: {
+        recordId,
+        kind,
+        ...(allergyName ? { allergyName } : {}),
+        ...(reactions ? { reactions } : {}),
+        ...(severity ? { severity } : {}),
+      },
+    };
+  }
+
+  return { errors };
+}
+
+export async function updateMedicalRecordForPet(
+  petId: string,
+  payload: UpdateMedicalRecordPayload,
+): Promise<{ kind: "vaccine" | "allergy"; id: string; updatedAt: string } | null> {
+  return prisma.$transaction(async (tx) => {
+    const pet = await tx.pet.findFirst({
+      where: { id: petId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!pet) return null;
+
+    if (payload.kind === "vaccine") {
+      const existing = await tx.vaccine.findFirst({
+        where: { id: payload.recordId, petId },
+      });
+      if (!existing) return null;
+
+      const updated = await tx.vaccine.update({
+        where: { id: existing.id },
+        data: {
+          ...(payload.vaccineName ? { vaccineName: payload.vaccineName } : {}),
+          ...(payload.dateAdministered
+            ? { dateAdministered: new Date(payload.dateAdministered) }
+            : {}),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          entityType: VACCINE_ENTITY,
+          entityId: updated.id,
+          action: "UPDATE",
+          changes: {
+            before: {
+              id: existing.id,
+              petId: existing.petId,
+              recordTypeId: existing.recordTypeId,
+              vaccineName: existing.vaccineName,
+              dateAdministered: existing.dateAdministered.toISOString(),
+              updatedAt: existing.updatedAt.toISOString(),
+            },
+            after: {
+              id: updated.id,
+              petId: updated.petId,
+              recordTypeId: updated.recordTypeId,
+              vaccineName: updated.vaccineName,
+              dateAdministered: updated.dateAdministered.toISOString(),
+              updatedAt: updated.updatedAt.toISOString(),
+            },
+          },
+        },
+      });
+
+      return {
+        kind: "vaccine",
+        id: updated.id,
+        updatedAt: updated.updatedAt.toISOString(),
+      };
+    }
+
+    const existing = await tx.allergy.findFirst({
+      where: { id: payload.recordId, petId },
+    });
+    if (!existing) return null;
+
+    const updated = await tx.allergy.update({
+      where: { id: existing.id },
+      data: {
+        ...(payload.allergyName ? { allergyName: payload.allergyName } : {}),
+        ...(payload.reactions ? { reactions: payload.reactions } : {}),
+        ...(payload.severity ? { severity: payload.severity } : {}),
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        entityType: ALLERGY_ENTITY,
+        entityId: updated.id,
+        action: "UPDATE",
+        changes: {
+          before: {
+            id: existing.id,
+            petId: existing.petId,
+            recordTypeId: existing.recordTypeId,
+            allergyName: existing.allergyName,
+            reactions: existing.reactions,
+            severity: existing.severity,
+            updatedAt: existing.updatedAt.toISOString(),
+          },
+          after: {
+            id: updated.id,
+            petId: updated.petId,
+            recordTypeId: updated.recordTypeId,
+            allergyName: updated.allergyName,
+            reactions: updated.reactions,
+            severity: updated.severity,
+            updatedAt: updated.updatedAt.toISOString(),
+          },
+        },
+      },
+    });
+
+    return {
+      kind: "allergy",
+      id: updated.id,
+      updatedAt: updated.updatedAt.toISOString(),
+    };
+  });
 }

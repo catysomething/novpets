@@ -59,6 +59,23 @@ type HealthRecordRow =
       id: string;
       vaccineName: string;
       dateAdministered: string;
+      updatedAt: string;
+    }
+  | {
+      kind: "allergy";
+      id: string;
+      allergyName: string;
+      reactions: string;
+      severity: "mild" | "severe";
+      updatedAt: string;
+    };
+
+type EditableMedicalRecord =
+  | {
+      kind: "vaccine";
+      id: string;
+      vaccineName: string;
+      dateAdministered: string;
     }
   | {
       kind: "allergy";
@@ -132,6 +149,11 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
   ]);
   const [medicalError, setMedicalError] = useState<string | null>(null);
   const [isSavingMedical, setIsSavingMedical] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<EditableMedicalRecord | null>(
+    null,
+  );
+  const [editMedicalError, setEditMedicalError] = useState<string | null>(null);
+  const [isSavingEditMedical, setIsSavingEditMedical] = useState(false);
 
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -170,6 +192,31 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
   function closeMedicalModal() {
     setMedicalOpen(false);
     setMedicalError(null);
+  }
+
+  function openEditMedicalRecord(row: HealthRecordRow) {
+    setEditMedicalError(null);
+    if (row.kind === "vaccine") {
+      setEditingRecord({
+        kind: "vaccine",
+        id: row.id,
+        vaccineName: row.vaccineName,
+        dateAdministered: dateInputValueFromIso(row.dateAdministered),
+      });
+      return;
+    }
+    setEditingRecord({
+      kind: "allergy",
+      id: row.id,
+      allergyName: row.allergyName,
+      reactions: row.reactions,
+      severity: row.severity,
+    });
+  }
+
+  function closeEditMedicalModal() {
+    setEditingRecord(null);
+    setEditMedicalError(null);
   }
 
   async function handleSaveEdit(event: FormEvent<HTMLFormElement>) {
@@ -296,6 +343,57 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
       window.alert("Could not delete pet.");
     } finally {
       setIsDeleting(false);
+    }
+  }
+
+  async function handleSaveEditedMedicalRecord(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pet || !editingRecord) return;
+
+    setEditMedicalError(null);
+    const formData = new FormData(event.currentTarget);
+
+    const payload: Record<string, unknown> = {
+      recordId: editingRecord.id,
+      kind: editingRecord.kind,
+    };
+
+    if (editingRecord.kind === "vaccine") {
+      payload.vaccineName = String(formData.get("vaccineName") ?? "").trim();
+      payload.dateAdministered = String(formData.get("dateAdministered") ?? "").trim();
+    } else {
+      payload.allergyName = String(formData.get("allergyName") ?? "").trim();
+      payload.reactions = String(formData.get("reactions") ?? "").trim();
+      payload.severity = String(formData.get("severity") ?? "").trim();
+    }
+
+    setIsSavingEditMedical(true);
+    try {
+      const response = await fetch(`/api/pets/${pet.id}/medical-records`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = (await response.json()) as {
+        error?: string;
+        details?: string[];
+      };
+
+      if (!response.ok) {
+        const extra = data.details?.length ? ` ${data.details.join(" ")}` : "";
+        setEditMedicalError(
+          `${data.error ?? "Could not update record."}${extra}`.trim(),
+        );
+        return;
+      }
+
+      closeEditMedicalModal();
+      await loadPet();
+    } catch {
+      setEditMedicalError("Could not update record. Please try again.");
+    } finally {
+      setIsSavingEditMedical(false);
     }
   }
 
@@ -447,7 +545,7 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
               <div className="mt-10">
                 <div className="max-w-2xl">
                   <h2 className="text-lg font-bold tracking-tight text-slate-900">
-                    Health records
+                    Care History
                   </h2>
                   <p className="mt-1.5 text-sm text-slate-500">
                     Immunizations and allergies on file for this pet.
@@ -455,7 +553,7 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
                   <button
                     type="button"
                     onClick={openMedicalModal}
-                    className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-900/15 transition hover:bg-indigo-500 hover:shadow-lg hover:shadow-indigo-900/20"
+                    className="mt-5 inline-flex items-center gap-2 rounded-xl bg-eucalyptus-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-eucalyptus-darker/25 transition hover:bg-eucalyptus-darker hover:shadow-lg"
                   >
                     <span className="flex size-6 items-center justify-center rounded-lg bg-white/20 text-base leading-none">
                       +
@@ -489,13 +587,17 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
                             <th className="px-4 py-3" scope="col">
                               Details
                             </th>
+                          <th className="pl-10 pr-4 py-3 text-right" scope="col">
+                            Updated
+                          </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 bg-white">
                           {healthRows.map((row) => (
                             <tr
                               key={`${row.kind}-${row.id}`}
-                              className="transition hover:bg-slate-50/80"
+                              className="cursor-pointer transition hover:bg-slate-50/80"
+                              onClick={() => openEditMedicalRecord(row)}
                             >
                               <td className="px-4 py-4 align-middle">
                                 <HealthRecordTypeIcon kind={row.kind} />
@@ -538,6 +640,14 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
                                     </p>
                                   </div>
                                 )}
+                              </td>
+                              <td className="pl-10 pr-4 py-4 text-right align-top text-slate-600">
+                                <time
+                                  dateTime={row.updatedAt}
+                                  className="text-xs font-medium tabular-nums"
+                                >
+                                  {new Date(row.updatedAt).toLocaleDateString()}
+                                </time>
                               </td>
                             </tr>
                           ))}
@@ -666,7 +776,7 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
                   <button
                     type="submit"
                     disabled={isSavingEdit}
-                    className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-900/15 transition hover:bg-indigo-500 disabled:opacity-60"
+                    className="rounded-xl bg-eucalyptus-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-eucalyptus-darker/25 transition hover:bg-eucalyptus-darker disabled:opacity-60"
                   >
                     {isSavingEdit ? "Saving…" : "Save changes"}
                   </button>
@@ -900,9 +1010,148 @@ export default function PetDetailsView({ petId }: PetDetailsViewProps) {
                 <button
                   type="submit"
                   disabled={isSavingMedical}
-                  className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  className="rounded-md bg-eucalyptus-dark px-4 py-2 text-sm font-medium text-white shadow-sm shadow-eucalyptus-darker/25 transition hover:bg-eucalyptus-darker disabled:opacity-60"
                 >
                   {isSavingMedical ? "Saving…" : "Save records"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {editingRecord ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-medical-record-title"
+        >
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl ring-1 ring-slate-900/5 sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <h2
+                id="edit-medical-record-title"
+                className="text-lg font-semibold text-slate-900"
+              >
+                Edit {editingRecord.kind === "vaccine" ? "vaccine" : "allergy"} record
+              </h2>
+              <button
+                type="button"
+                onClick={closeEditMedicalModal}
+                className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="mt-6 space-y-4" onSubmit={handleSaveEditedMedicalRecord}>
+              {editingRecord.kind === "vaccine" ? (
+                <>
+                  <div>
+                    <label
+                      htmlFor="edit-vaccine-name"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Vaccine name
+                    </label>
+                    <input
+                      id="edit-vaccine-name"
+                      name="vaccineName"
+                      required
+                      defaultValue={editingRecord.vaccineName}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="edit-date-administered"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Date administered
+                    </label>
+                    <input
+                      id="edit-date-administered"
+                      name="dateAdministered"
+                      type="date"
+                      required
+                      defaultValue={editingRecord.dateAdministered}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label
+                      htmlFor="edit-allergy-name"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Allergy name
+                    </label>
+                    <input
+                      id="edit-allergy-name"
+                      name="allergyName"
+                      required
+                      defaultValue={editingRecord.allergyName}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="edit-reactions"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Reactions
+                    </label>
+                    <input
+                      id="edit-reactions"
+                      name="reactions"
+                      required
+                      defaultValue={editingRecord.reactions}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="edit-severity"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Severity
+                    </label>
+                    <select
+                      id="edit-severity"
+                      name="severity"
+                      defaultValue={editingRecord.severity}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    >
+                      <option value="mild">Mild</option>
+                      <option value="severe">Severe</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {editMedicalError ? (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {editMedicalError}
+                </p>
+              ) : null}
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={closeEditMedicalModal}
+                  className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEditMedical}
+                  className="rounded-md bg-eucalyptus-dark px-4 py-2 text-sm font-medium text-white shadow-sm shadow-eucalyptus-darker/25 transition hover:bg-eucalyptus-darker disabled:opacity-60"
+                >
+                  {isSavingEditMedical ? "Saving…" : "Save changes"}
                 </button>
               </div>
             </form>

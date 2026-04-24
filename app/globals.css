@@ -7,6 +7,8 @@
   --novellia-eucalyptus: #ddece4;
   --novellia-eucalyptus-wash: #f0f7f3;
   --novellia-eucalyptus-depth: #c4dccf;
+  --novellia-eucalyptus-dark: #5a716c;
+  --novellia-eucalyptus-darker: #4a5f5b;
 }
 
 @theme inline {
@@ -15,6 +17,8 @@
   --color-eucalyptus: var(--novellia-eucalyptus);
   --color-eucalyptus-wash: var(--novellia-eucalyptus-wash);
   --color-eucalyptus-depth: var(--novellia-eucalyptus-depth);
+  --color-eucalyptus-dark: var(--novellia-eucalyptus-dark);
+  --color-eucalyptus-darker: var(--novellia-eucalyptus-darker);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

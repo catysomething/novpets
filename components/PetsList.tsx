@@ -223,7 +223,7 @@ export default function PetsList({ refreshKey = 0 }: PetsListProps) {
                       {isExpanded ? (
                         <tr className="bg-slate-50/60">
                           <td colSpan={6} className="px-6 py-4">
-                            <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-4">
                               <div className="rounded-md border border-slate-200 bg-white p-4">
                                 <h3 className="text-sm font-semibold text-slate-900">
                                   Vaccine Records

@@ -16,7 +16,7 @@ export default async function DashboardPage() {
           </div>
           <Link
             href="/pets"
-            className="inline-flex shrink-0 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+            className="inline-flex shrink-0 items-center justify-center rounded-md bg-eucalyptus-dark px-4 py-2 text-sm font-medium text-white shadow-sm shadow-eucalyptus-darker/25 transition hover:bg-eucalyptus-darker"
           >
             View pets list
           </Link>
