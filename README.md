@@ -1,6 +1,6 @@
 # Novellia Pets
 
-Next.js app for the Novellia Pets take-home project.
+This demo app will track pets' medical histories and basic profile information.
 
 ## Local Development (Docker + Hot Reload)
 
