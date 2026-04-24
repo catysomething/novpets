@@ -5,19 +5,18 @@ import { usePathname } from "next/navigation";
 
 function navItemClass(active: boolean) {
   return active
-    ? "block rounded-md bg-slate-100 px-3 py-2 font-medium text-slate-900"
-    : "block rounded-md px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100";
+    ? "block rounded-md bg-white/70 px-3 py-2 font-medium text-slate-900 shadow-sm ring-1 ring-emerald-950/10"
+    : "block rounded-md px-3 py-2 font-medium text-slate-700 transition hover:bg-white/45";
 }
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const isDashboard = pathname === "/";
-  const isPetsNav =
-    pathname === "/pets" || pathname.startsWith("/pets/");
+  const isPetsNav = pathname === "/pets" || pathname.startsWith("/pets/");
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white md:flex md:flex-col">
-      <div className="border-b border-slate-200 px-6 py-5">
+    <aside className="hidden w-64 shrink-0 border-r border-emerald-950/10 bg-eucalyptus md:flex md:flex-col">
+      <div className="border-b border-emerald-950/10 px-6 py-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Novellia
         </p>

@@ -3,11 +3,18 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Pale eucalyptus — sidebar, profiles, soft accents */
+  --novellia-eucalyptus: #ddece4;
+  --novellia-eucalyptus-wash: #f0f7f3;
+  --novellia-eucalyptus-depth: #c4dccf;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-eucalyptus: var(--novellia-eucalyptus);
+  --color-eucalyptus-wash: var(--novellia-eucalyptus-wash);
+  --color-eucalyptus-depth: var(--novellia-eucalyptus-depth);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

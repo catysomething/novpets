@@ -213,7 +213,7 @@ export default function PetsList({ refreshKey = 0 }: PetsListProps) {
                         <td className="px-6 py-4 text-right">
                           <Link
                             href={`/pets/${pet.id}`}
-                            className="inline-block rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-800 shadow-sm transition hover:bg-indigo-50"
+                            className="inline-block rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm transition hover:bg-emerald-50"
                           >
                             View pet details
                           </Link>
